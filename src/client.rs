@@ -424,7 +424,7 @@ impl Client {
                     let mut path = path;
                     path.remove(0);
                     path.remove(0);
-                    let size = metadatas.iter().map(|x| x.amount).sum::<i64>();
+                    let size = metadatas.iter().unique_by(|x| &x.block_id).map(|x| x.amount).sum::<i64>();
                     let pretty_size = byte_unit::Byte::from_bytes(size as u128)
                         .get_appropriate_unit(true)
                         .to_string();
