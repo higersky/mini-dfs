@@ -315,6 +315,7 @@ impl Nameserver {
             let list = dir
                 .filter_map(|x| x.ok())
                 .map(|x| x.file_name().to_string_lossy().to_string())
+                .filter(|x| x != FILE_METADATA_FILE && x != BLOCKS_METADATA_FILE)
                 .collect::<Vec<_>>();
             client_tx.send(NameserverResponse::List(ListReply { list: Some(list) }))
         } else {
@@ -416,7 +417,7 @@ impl Nameserver {
                     }
                 } else {
                     r = client_tx.send(NameserverResponse::Read(ReadReply::default()));
-                    println!("connection fail");
+                    // println!("connection fail");
                 }
             }
         } else {
