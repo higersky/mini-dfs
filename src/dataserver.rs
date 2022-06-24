@@ -1,3 +1,6 @@
+use anyhow::Result;
+use rand::seq::IteratorRandom;
+use serde::{Deserialize, Serialize};
 use std::{
     collections::HashMap,
     fs::File,
@@ -9,9 +12,6 @@ use std::{
     },
     time::Duration,
 };
-
-use anyhow::Result;
-use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::{
@@ -44,6 +44,7 @@ pub struct Data {
 
 const BLOB_FILE: &str = "blob";
 const METADATA_FILE: &str = "metadata.json";
+const REPLICAS: usize = 3;
 
 impl Data {
     pub fn new(path: String, file_id: String, offset: i64, blob: Vec<u8>) -> Data {
@@ -164,6 +165,7 @@ impl Dataserver {
         } else {
             panic!("unknown response: {:#?}", r);
         }
+        let mut rng = rand::thread_rng();
         loop {
             let msg = self.rx.recv_timeout(Duration::from_secs(TIMEOUT_SECONDS));
             if let Ok(msg) = msg {
@@ -181,18 +183,25 @@ impl Dataserver {
                     DataserverRequest::Write(data) => {
                         let block_id = Self::assign_id();
                         self.save_block(&data, &block_id, address)?;
-                        for (addr, replica_tx) in self.dataserver_request_senders.iter() {
-                            if *addr != address {
-                                replica_tx.send((
-                                    address,
-                                    DataserverRequest::Replica(data.clone(), block_id.clone()),
-                                ))?;
-                            }
+                        for (_, replica_tx) in self
+                            .dataserver_request_senders
+                            .iter()
+                            .filter(|(addr, _)| **addr != address)
+                            .choose_multiple(&mut rng, REPLICAS - 1)
+                        {
+                            replica_tx.send((
+                                address,
+                                DataserverRequest::Replica(data.clone(), block_id.clone()),
+                            ))?;
                         }
                         client_tx.send(DataserverResponse::Write(true))?;
                     }
                     DataserverRequest::Replica(data, block_id) => {
                         self.save_block(&data, &block_id, address)?;
+                        // println!(
+                        //     "replica of block {} saved on {}",
+                        //     data.metadata.offset, address
+                        // );
                         // dbg!(client_tx_id);
                     }
                 }
