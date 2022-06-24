@@ -68,9 +68,11 @@ impl Client {
             dataserver_response_receivers,
         }
     }
+
     pub fn run(&mut self, stop_token: &AtomicBool, cwd: &Path, address: usize) -> Result<()> {
         let mut rl = Editor::<()>::new();
         let _ = rl.load_history(&cwd.join("history.txt"));
+        println!("Welcome to MiniDFS, type 'help' to show avilable commands");
         loop {
             if stop_token.load(std::sync::atomic::Ordering::Relaxed) {
                 break;
@@ -86,6 +88,15 @@ impl Client {
                     let r;
                     match commands {
                         Ok(commands) => match commands[0].as_str() {
+                            "help" => {
+                                println!(
+                                    "Available commands:\n\tlist [directory]\n\tcreate <directory>\n\tfile <path>\n\tlocate <id>\n\twrite <local path> <path>\n\tread <path> <local path> [offset]"
+                                );
+                                r = Ok(());
+                            }
+                            "exit" => {
+                                break;
+                            }
                             "list" => {
                                 r = if commands.len() == 1 {
                                     self.list("./".into(), address)
@@ -396,7 +407,12 @@ impl Client {
             }),
         ))?;
         let resp = self.nameserver_response_receiver.recv()?;
-        if let NameserverResponse::Read(ReadReply { valid, file_id, metadatas }) = resp {
+        if let NameserverResponse::Read(ReadReply {
+            valid,
+            file_id,
+            metadatas,
+        }) = resp
+        {
             if valid {
                 if metadatas.is_empty() {
                     let mut path = path;
@@ -413,8 +429,7 @@ impl Client {
                         .get_appropriate_unit(true)
                         .to_string();
                     println!("{}: file (size = {}, id = {})", &path, pretty_size, file_id);
-                    let table =
-                        tabled::Table::new(metadatas.iter().map(DisplayMetadata::from));
+                    let table = tabled::Table::new(metadatas.iter().map(DisplayMetadata::from));
                     println!("{}", table);
                     Ok(())
                 }
@@ -429,19 +444,14 @@ impl Client {
     fn create(&self, path: String, address: usize) -> Result<()> {
         self.nameserver_request_sender.send((
             address,
-            NameserverRequest::Create(CreateParams {
-                path: path.clone()
-            }),
+            NameserverRequest::Create(CreateParams { path: path.clone() }),
         ))?;
         let resp = self.nameserver_response_receiver.recv()?;
         if let NameserverResponse::Create(CreateReply { status }) = resp {
             if status {
                 Ok(())
             } else {
-                Err(anyhow::anyhow!(
-                    "error: failed to make directory {}",
-                    path
-                ))
+                Err(anyhow::anyhow!("error: failed to make directory {}", path))
             }
         } else {
             panic!("error: unknown response {:#?} from nameserver", resp);

@@ -5,7 +5,7 @@ use fs2::FileExt;
 use path_absolutize::Absolutize;
 use rand::prelude::SliceRandom;
 use std::collections::HashMap;
-use std::io::{Write, Read};
+use std::io::{Read, Write};
 use std::path::Path;
 use std::sync::atomic::AtomicBool;
 use std::sync::mpsc::{channel, Receiver, Sender};
@@ -395,10 +395,10 @@ impl Nameserver {
                         .filter_map(|s| s.ok())
                         .collect::<Vec<_>>();
                     let file_id = {
-                        let f= File::open(file_folder.join(FILE_METADATA_FILE));
+                        let f = File::open(file_folder.join(FILE_METADATA_FILE));
                         if let Ok(mut f) = f {
                             let mut buf = String::new();
-                            let _  = f.read_to_string(&mut buf);
+                            let _ = f.read_to_string(&mut buf);
                             buf
                         } else {
                             Default::default()
